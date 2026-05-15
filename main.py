@@ -78,6 +78,14 @@ def is_no_forward(message):
     return bool(getattr(message, "noforwards", False))
 
 
+def is_view_once(message):
+    """Cek apakah pesan adalah media view-once/timer (ttl_seconds)."""
+    media = getattr(message, "media", None)
+    if media is None:
+        return False
+    return bool(getattr(media, "ttl_seconds", None))
+
+
 def is_sticker_doc(doc):
     if doc is None:
         return False
@@ -238,7 +246,7 @@ FITUR_VIP_TEXT = (
 GUIDE_TEXT = (
     "📖 *Panduan Penggunaan Rams VIP Bot*\n\n"
     "━━━━━━━━━━━━━━━━━\n"
-    "🔹 *Command .dl \u2014 Download Media*\n"
+    "🔹 *Command .dl — Download Media*\n"
     "Digunakan untuk mendownload media view-once (sekali lihat) atau "
     "media dari chat restricted yang tidak bisa di-forward.\n\n"
     "*Cara pakai:*\n"
@@ -248,7 +256,7 @@ GUIDE_TEXT = (
     "4. Media akan otomatis tersimpan di Saved Messages kamu\n\n"
     "⚠️ Pastikan kamu sudah reply ke pesan medianya, bukan ke pesan teks biasa.\n\n"
     "━━━━━━━━━━━━━━━━━\n"
-    "🔹 *Command .copy \u2014 Copy dari Channel/Grup*\n"
+    "🔹 *Command .copy — Copy dari Channel/Grup*\n"
     "Digunakan untuk menyalin konten (foto, video, dokumen, teks) dari "
     "channel atau grup yang tidak mengizinkan forward.\n\n"
     "*Cara pakai:*\n"
@@ -483,7 +491,12 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
         msg = event.message
         if not msg or not msg.media:
             return
-        if not is_no_forward(msg):
+
+        # FIX: Cek view-once via ttl_seconds ATAU noforwards
+        # Media view-once diidentifikasi oleh ttl_seconds, bukan hanya noforwards
+        is_vo = is_view_once(msg)
+        is_nf = is_no_forward(msg)
+        if not is_vo and not is_nf:
             return
 
         lock = dl_locks.get(user_id)
@@ -501,7 +514,8 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
                 await status_msg.delete()
                 file_obj = io.BytesIO(media_bytes)
                 file_obj.name = "auto_dl_media"
-                await client.send_file("me", file=file_obj, caption="✅ Auto DL Timer/View-Once berhasil disimpan.")
+                label = "View-Once" if is_vo else "No-Forward"
+                await client.send_file("me", file=file_obj, caption=f"✅ Auto DL {label} berhasil disimpan.")
             except Exception as e:
                 await client.send_message("me", f"❌ Auto DL error: {e}")
 
