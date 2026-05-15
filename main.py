@@ -492,8 +492,6 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
         if not msg or not msg.media:
             return
 
-        # FIX: Cek view-once via ttl_seconds ATAU noforwards
-        # Media view-once diidentifikasi oleh ttl_seconds, bukan hanya noforwards
         is_vo = is_view_once(msg)
         is_nf = is_no_forward(msg)
         if not is_vo and not is_nf:
@@ -511,11 +509,72 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
                 if not media_bytes:
                     await status_msg.edit("❌ Auto DL gagal: media kosong.")
                     return
-                await status_msg.delete()
-                file_obj = io.BytesIO(media_bytes)
-                file_obj.name = "auto_dl_media"
+
                 label = "View-Once" if is_vo else "No-Forward"
-                await client.send_file("me", file=file_obj, caption=f"✅ Auto DL {label} berhasil disimpan.")
+                caption = f"✅ Auto DL {label} berhasil disimpan."
+                file_obj = io.BytesIO(media_bytes)
+
+                await status_msg.delete()
+
+                if isinstance(msg.media, MessageMediaPhoto):
+                    file_obj.name = "photo.jpg"
+                    await client.send_file("me", file=file_obj, caption=caption)
+
+                elif isinstance(msg.media, MessageMediaDocument):
+                    doc = msg.media.document
+                    mime = getattr(doc, "mime_type", "") or ""
+
+                    if is_sticker_doc(doc):
+                        if "webp" in mime:        file_obj.name = "sticker.webp"
+                        elif "tgsticker" in mime: file_obj.name = "sticker.tgs"
+                        elif "video" in mime:     file_obj.name = "sticker.webm"
+                        else:                      file_obj.name = "sticker.webp"
+                        await client.send_file("me", file=file_obj, force_document=False)
+
+                    elif "video" in mime or "mp4" in mime:
+                        video_attr = get_video_attributes(doc)
+                        fname = get_file_name(doc) or "video.mp4"
+                        file_obj.name = fname
+                        send_attrs = []
+                        if video_attr:
+                            send_attrs = [DocumentAttributeVideo(
+                                duration=video_attr.duration,
+                                w=video_attr.w,
+                                h=video_attr.h,
+                                supports_streaming=True,
+                                round_message=False,
+                            )]
+                        await client.send_file(
+                            "me", file=file_obj,
+                            caption=caption,
+                            attributes=send_attrs if send_attrs else None,
+                            allow_cache=False,
+                        )
+
+                    else:
+                        fname = get_file_name(doc) or "document"
+                        if "." not in fname:
+                            ext_map = {
+                                "image/jpeg": ".jpg",
+                                "image/png":  ".png",
+                                "audio/mpeg": ".mp3",
+                                "audio/ogg":  ".ogg",
+                                "application/pdf": ".pdf",
+                                "video/webm": ".webm",
+                                "image/gif":  ".gif",
+                            }
+                            fname += ext_map.get(mime, "")
+                        file_obj.name = fname
+                        await client.send_file(
+                            "me", file=file_obj,
+                            caption=caption,
+                            force_document=False, allow_cache=False,
+                        )
+
+                else:
+                    file_obj.name = "auto_dl_media"
+                    await client.send_file("me", file=file_obj, caption=caption)
+
             except Exception as e:
                 await client.send_message("me", f"❌ Auto DL error: {e}")
 
