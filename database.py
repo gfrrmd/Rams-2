@@ -48,6 +48,12 @@ def init_db():
         )
     """)
 
+    # Migrasi: tambah kolom jika belum ada (untuk database yang sudah berjalan)
+    c.execute("""
+        ALTER TABLE user_settings
+        ADD COLUMN IF NOT EXISTS auto_dl_view_once INTEGER DEFAULT 0
+    """)
+
     conn.commit()
     conn.close()
 
