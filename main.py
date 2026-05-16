@@ -513,6 +513,10 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
         if _dl_dedup_check(user_id, event.id):
             return
 
+        # Hanya proses dari private chat (DM), abaikan grup & channel
+        if not event.is_private:
+            return
+
         msg = event.message
         if not msg or not msg.media:
             return
