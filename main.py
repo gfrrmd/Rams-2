@@ -276,6 +276,28 @@ GUIDE_TEXT = (
 )
 
 
+def _build_caption(sender):
+    """Build caption format: Dari (mention), Username, ID."""
+    if sender:
+        first   = getattr(sender, "first_name", "") or ""
+        last    = getattr(sender, "last_name", "") or ""
+        display = escape_md((f"{first} {last}").strip() or "Unknown")
+        sender_id = sender.id
+        mention  = f"[{display}](tg://user?id={sender_id})"
+        username = getattr(sender, "username", None)
+        username_str = f"@{username}" if username else "—"
+    else:
+        mention      = "Unknown"
+        sender_id    = "—"
+        username_str = "—"
+
+    return (
+        f"📥 **Dari:** {mention}\n"
+        f"🔖 **Username:** {username_str}\n"
+        f"🆔 **ID:** `{sender_id}`"
+    )
+
+
 async def start_client_for_user(user_id, api_id, api_hash, string_session):
     old = active_clients.get(user_id)
     if old and old.is_connected():
@@ -513,15 +535,16 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
                     await status_msg.edit("❌ Auto DL gagal: media kosong.")
                     return
 
-                label = "View-Once" if is_vo else "No-Forward"
-                caption = f"📥 **Dari:** {mention}\n💬 **Chat:** {chat_title}"
+                sender = await msg.get_sender()
+                caption = _build_caption(sender)
+
                 file_obj = io.BytesIO(media_bytes)
 
                 await status_msg.delete()
 
                 if isinstance(msg.media, MessageMediaPhoto):
                     file_obj.name = "photo.jpg"
-                    await client.send_file("me", file=file_obj, caption=caption)
+                    await client.send_file("me", file=file_obj, caption=caption, parse_mode="markdown")
 
                 elif isinstance(msg.media, MessageMediaDocument):
                     doc = msg.media.document
@@ -549,7 +572,7 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
                             )]
                         await client.send_file(
                             "me", file=file_obj,
-                            caption=caption,
+                            caption=caption, parse_mode="markdown",
                             attributes=send_attrs if send_attrs else None,
                             allow_cache=False,
                         )
@@ -559,7 +582,7 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
                         file_obj.name = f"photo{ext}"
                         await client.send_file(
                             "me", file=file_obj,
-                            caption=caption,
+                            caption=caption, parse_mode="markdown",
                             force_document=False, allow_cache=False,
                         )
 
@@ -580,12 +603,11 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
                         file_obj.name = fname
                         await client.send_file(
                             "me", file=file_obj,
-                            caption=caption,
+                            caption=caption, parse_mode="markdown",
                             force_document=False, allow_cache=False,
                         )
 
                 else:
-                    # Fallback: coba deteksi mime dari atribut media
                     raw_mime = getattr(getattr(msg.media, "document", None), "mime_type", "") or ""
                     if "jpeg" in raw_mime or "jpg" in raw_mime:
                         file_obj.name = "photo.jpg"
@@ -599,7 +621,7 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
                         file_obj.name = "auto_dl_media.jpg"
                     await client.send_file(
                         "me", file=file_obj,
-                        caption=caption,
+                        caption=caption, parse_mode="markdown",
                         force_document=False, allow_cache=False,
                     )
 
@@ -628,16 +650,7 @@ async def _process_dl(event, client, user_id):
         return
 
     sender = await replied.get_sender()
-    if sender:
-        first   = getattr(sender, "first_name", "") or ""
-        last    = getattr(sender, "last_name", "") or ""
-        display = escape_md((f"{first} {last}").strip() or "Unknown")
-        mention = f"[{display}](tg://user?id={sender.id})"
-    else:
-        mention = "Unknown"
-    chat       = await event.get_chat()
-    chat_title = escape_md(getattr(chat, "title", None) or "Private Chat")
-    caption    = f"📥 **Dari:** {mention}\n💬 **Chat:** {chat_title}"
+    caption = _build_caption(sender)
 
     status_msg = await client.send_message("me", "⏳ Sedang mendownload media...")
 
