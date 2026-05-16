@@ -552,24 +552,31 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
                         )
 
                     else:
-                        fname = get_file_name(doc) or "document"
-                        if "." not in fname:
-                            ext_map = {
-                                "image/jpeg": ".jpg",
-                                "image/png":  ".png",
-                                "audio/mpeg": ".mp3",
-                                "audio/ogg":  ".ogg",
-                                "application/pdf": ".pdf",
-                                "video/webm": ".webm",
-                                "image/gif":  ".gif",
-                            }
-                            fname += ext_map.get(mime, "")
-                        file_obj.name = fname
-                        await client.send_file(
-                            "me", file=file_obj,
-                            caption=caption,
-                            force_document=False, allow_cache=False,
-                        )
+                        if mime in ("image/jpeg", "image/png", "image/webp"):
+                            ext = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}.get(mime, ".jpg")
+                            file_obj.name = f"photo{ext}"
+                            await client.send_file(
+                                "me", file=file_obj,
+                                caption=caption,
+                                force_document=False, allow_cache=False,
+                            )
+                        else:
+                            fname = get_file_name(doc) or "document"
+                            if "." not in fname:
+                                ext_map = {
+                                    "audio/mpeg": ".mp3",
+                                    "audio/ogg":  ".ogg",
+                                    "application/pdf": ".pdf",
+                                    "video/webm": ".webm",
+                                    "image/gif":  ".gif",
+                                }
+                                fname += ext_map.get(mime, "")
+                            file_obj.name = fname
+                            await client.send_file(
+                                "me", file=file_obj,
+                                caption=caption,
+                                force_document=False, allow_cache=False,
+                            )
 
                 else:
                     file_obj.name = "auto_dl_media"
