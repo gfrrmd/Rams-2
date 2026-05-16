@@ -514,7 +514,7 @@ async def start_client_for_user(user_id, api_id, api_hash, string_session):
                     return
 
                 label = "View-Once" if is_vo else "No-Forward"
-                caption = f"✅ Auto DL {label} berhasil disimpan."
+                caption = f"📥 **Dari:** {mention}\n💬 **Chat:** {chat_title}"
                 file_obj = io.BytesIO(media_bytes)
 
                 await status_msg.delete()
